@@ -66,17 +66,13 @@ export const MainPage = () => {
           </button>
         </a>
       </div>
-      {isLoading && (
-        <div className="skeleton__wrapper">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} />
-          ))}
-        </div>
-      )}
-      {works.map((work) => (
-        <MainCard key={work.id} work={work} />
-      ))}
-      <div></div>
+      <div className="cards__wrapper">
+        {isLoading &&
+          Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} />)}
+        {works.map((work) => (
+          <MainCard key={work.id} work={work} />
+        ))}
+      </div>
     </div>
   );
 };
