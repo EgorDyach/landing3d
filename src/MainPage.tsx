@@ -1,3 +1,6 @@
+import Zoom from "yet-another-react-lightbox/plugins/zoom";
+import { Lightbox } from "yet-another-react-lightbox";
+import "yet-another-react-lightbox/styles.css";
 import { collection, getDocs } from "@firebase/firestore";
 import { useEffect, useState } from "react";
 import { MainCard } from "./MainCard";
@@ -14,7 +17,10 @@ export type Work = {
 
 export const MainPage = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalData, setModalData] = useState<null | Work>(null);
   const [works, setWorks] = useState<Work[]>([]);
+
   useEffect(() => {
     (async () => {
       const querySnapshot = await getDocs(collection(db, "works"));
@@ -36,11 +42,16 @@ export const MainPage = () => {
     })();
   }, []);
 
+  const openModal = (work: Work) => {
+    setModalData(work);
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="main">
       <div className="main__header">
         <h1 className="main__header-title">Наше портфолио</h1>
-        <a href="https://t.me/egor_dyachenko" className="main__header-contact">
+        <a href="https://t.me/kolenmab" className="main__header-contact">
           <button>
             <svg
               style={{ marginRight: 5 }}
@@ -70,9 +81,18 @@ export const MainPage = () => {
         {isLoading &&
           Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} />)}
         {works.map((work) => (
-          <MainCard key={work.id} work={work} />
+          <MainCard key={work.id} setIsModalOpen={openModal} work={work} />
         ))}
       </div>
+      {modalData && (
+        <Lightbox
+          plugins={[Zoom]}
+          carousel={{ finite: true }}
+          open={isModalOpen}
+          close={() => setIsModalOpen(false)}
+          slides={modalData.photoLinks.map((el) => ({ src: el }))}
+        />
+      )}
     </div>
   );
 };

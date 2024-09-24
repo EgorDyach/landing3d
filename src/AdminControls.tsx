@@ -1,13 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { signOut } from "@firebase/auth";
-import { ref, uploadBytes } from "@firebase/storage";
+import { getDownloadURL, ref, uploadBytes } from "@firebase/storage";
 import { auth, db, storage } from "./firebase";
 import { uuidv4 } from "@firebase/util";
-import { addDoc, collection } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+} from "firebase/firestore";
+import { MainCard } from "./MainCard";
+import { Work } from "./MainPage";
+import { Skeleton } from "./Skeleton";
+import Lightbox from "yet-another-react-lightbox";
+import Zoom from "yet-another-react-lightbox/plugins/zoom";
 
 export const AdminControls = () => {
   const [typeOfPage, setTypeOfPage] = useState<"form" | "gallary">("form");
+  const [works, setWorks] = useState<Work[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAddingLoading, setIsAddingLoading] = useState(false);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalData, setModalData] = useState<null | Work>(null);
   const [formValue, setFormValue] = useState<{
     isEditing: boolean;
     name: string;
@@ -20,9 +37,47 @@ export const AdminControls = () => {
     photos: [],
   });
 
+  const openModal = (work: Work) => {
+    setModalData(work);
+    setIsModalOpen(true);
+  };
+
+  const onRemove = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "works", id));
+      setWorks((prev) => prev.filter((el) => el.id !== id));
+    } catch {
+      alert("Не удалось удалить!");
+    }
+  };
+
+  const getWorks = async () => {
+    const querySnapshot = await getDocs(collection(db, "works"));
+    const newWorks: Work[] = [];
+    for (const doc of querySnapshot.docs) {
+      const photos = [];
+      for await (const id of doc.data().photoLinks) {
+        const link = await getDownloadURL(ref(storage, id));
+        photos.push(link);
+      }
+      newWorks.push({
+        ...doc.data(),
+        id: doc.id,
+        photoLinks: photos,
+      } as Work);
+    }
+    setWorks(newWorks);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    getWorks();
+  }, []);
+
   const handleAdd = async () => {
     const photoLinks: string[] = [];
     if (!auth.currentUser) return;
+    setIsAddingLoading(true);
     try {
       for (const file of formValue.photos) {
         const storageRef = ref(
@@ -44,8 +99,11 @@ export const AdminControls = () => {
         description: "",
         photos: [],
       });
+      getWorks();
     } catch (e) {
       alert(e);
+    } finally {
+      setIsAddingLoading(false);
     }
   };
 
@@ -181,6 +239,7 @@ export const AdminControls = () => {
             onClick={handleAdd}
             className="form__add"
             disabled={
+              isAddingLoading ||
               !formValue.description ||
               !formValue.name ||
               !formValue.photos.length
@@ -190,7 +249,32 @@ export const AdminControls = () => {
           </button>
         </div>
       )}
-      {typeOfPage === "gallary" && <div></div>}
+      {typeOfPage === "gallary" && (
+        <div className="cards__wrapper admin__wrapper">
+          {isLoading &&
+            Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} />
+            ))}
+          {works.map((work) => (
+            <MainCard
+              setIsModalOpen={openModal}
+              onRemove={onRemove}
+              isAdmin
+              key={work.id}
+              work={work}
+            />
+          ))}
+        </div>
+      )}
+      {modalData && (
+        <Lightbox
+          plugins={[Zoom]}
+          carousel={{ finite: true }}
+          open={isModalOpen}
+          close={() => setIsModalOpen(false)}
+          slides={modalData.photoLinks.map((el) => ({ src: el }))}
+        />
+      )}
     </div>
   );
 };
